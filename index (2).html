@@ -1,0 +1,662 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Cornerstone Rentals</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one ledger page. Month stepper on top, tabs for Billing / Unpaid / History / Settings.
+   Each unit is a door-plate card with meter readings in mono; status is shown by pill + text. */
+:root{
+  --bg:#F1F4F5; --surface:#FFFFFF; --soft:#E9EEF0; --ink:#15202B; --muted:#58656F; --line:#D5DDE1;
+  --accent:#1F4E8C; --accent-ink:#FFFFFF;
+  --ok:#1B7249; --ok-bg:#DCF1E5; --warn:#7F5200; --warn-bg:#F8EAC8; --bad:#A02E29; --bad-bg:#F8DBD8;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E151B; --surface:#17212A; --soft:#0F1920; --ink:#E5ECF0; --muted:#97A5B0; --line:#2A3742;
+    --accent:#7DAEEF; --accent-ink:#0A1620;
+    --ok:#6DD3A0; --ok-bg:#16382A; --warn:#E8C269; --warn-bg:#392E10; --bad:#F29B95; --bad-bg:#42201E;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E151B; --surface:#17212A; --soft:#0F1920; --ink:#E5ECF0; --muted:#97A5B0; --line:#2A3742;
+  --accent:#7DAEEF; --accent-ink:#0A1620;
+  --ok:#6DD3A0; --ok-bg:#16382A; --warn:#E8C269; --warn-bg:#392E10; --bad:#F29B95; --bad-bg:#42201E;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--font-body); font-size:15px; line-height:1.45;
+  padding-block:20px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.page{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.k{font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:flex-end;justify-content:space-between}
+h1{margin:0;font-size:27px;font-weight:600;letter-spacing:-.015em;text-wrap:balance}
+h2{margin:0;font-size:17px;font-weight:600;text-wrap:balance}
+.stepper{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.stepper button{width:42px;height:42px;border:0;background:transparent;font-size:20px;cursor:pointer;border-radius:8px}
+.stepper button:hover:not(:disabled){background:var(--soft)}
+.stepper button:disabled{opacity:.35;cursor:default}
+.stepper .lbl{min-width:150px;text-align:center;font-weight:500}
+
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:transparent;padding:10px 14px;cursor:pointer;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--bad-bg);color:var(--bad);font-size:12px;line-height:20px;text-align:center}
+
+.btn{height:40px;padding:0 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);cursor:pointer;font-weight:500}
+.btn:hover:not(:disabled){background:var(--soft)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover:not(:disabled){background:var(--accent);filter:brightness(1.08)}
+
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));border:1px solid var(--line);border-radius:10px;background:var(--surface);overflow:hidden}
+.strip>div{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-right:1px solid var(--line);min-width:0}
+.strip>div:last-child{border-right:0}
+.strip .v{font-size:19px;font-weight:500}
+.sub{margin:0;color:var(--muted);font-size:13px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:flex;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{flex:1;border:0;border-right:1px solid var(--line);background:transparent;padding:0 16px;height:40px;cursor:pointer;font-weight:500}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.seg .n{font-family:var(--font-mono);font-size:12px;margin-left:6px;opacity:.85}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:12px}
+.unit{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);min-width:0}
+.uh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.plate{min-width:46px;padding:3px 8px;text-align:center;border:2px solid var(--ink);border-radius:4px;font-family:var(--font-mono);font-weight:500;font-size:17px;line-height:1.2}
+.pill{padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;background:var(--soft);color:var(--muted)}
+.unit[data-st="paid"] .pill{background:var(--ok-bg);color:var(--ok)}
+.unit[data-st="part"] .pill{background:var(--warn-bg);color:var(--warn)}
+.unit[data-st="unpaid"] .pill{background:var(--bad-bg);color:var(--bad)}
+.tot{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end}
+.tot .mono{font-size:17px;font-weight:500}
+.meter{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.ro{display:flex;align-items:center;height:40px;padding:0 10px;border-radius:6px;background:var(--soft);color:var(--muted);overflow:hidden}
+input[type="text"],input:not([type]),select,textarea{font-size:16px}
+input[type="text"],input:not([type]),select{width:100%;min-width:0;height:44px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:var(--soft)}
+input.mono{text-align:right}
+input:disabled{opacity:.6}
+.warn{margin:0;padding:8px 10px;border-radius:6px;background:var(--bad-bg);color:var(--bad);font-size:13px}
+.break{margin:0;color:var(--muted);font-size:13px}
+.pay{display:flex;flex-direction:column;gap:8px;padding-top:10px;border-top:1px solid var(--line)}
+.pay-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pay-actions .btn{height:38px}
+.unit[data-st="paid"] [data-act="paid"]{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.unit[data-st="unpaid"] [data-act="unpaid"]{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.pay-amt{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end}
+.owes{display:flex;align-items:center;min-height:40px;font-weight:600;font-size:14px}
+.unit[data-st="part"] .owes{color:var(--warn)}
+.unit[data-st="unpaid"] .owes{color:var(--bad)}
+.unit[data-st="paid"] .owes{color:var(--ok)}
+
+.panel{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.house-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.list{display:flex;flex-direction:column}
+.li{display:grid;grid-template-columns:auto 1fr auto auto;gap:6px 12px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.li:first-child{border-top:0}
+.li .who{min-width:0}
+.li .amt{font-family:var(--font-mono);font-weight:500;text-align:right;color:var(--bad)}
+.empty{padding:28px 8px;text-align:center;color:var(--muted)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{padding:10px 12px;text-align:right;font-size:11px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px 12px;text-align:right;border-top:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;font-family:var(--font-body)}
+tbody tr:first-child td{border-top:0}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--soft);cursor:pointer}
+.chip input{width:18px;height:18px;margin:0}
+textarea{width:100%;min-height:120px;padding:10px;border:1px solid var(--line);border-radius:6px;background:var(--soft);font-family:var(--font-mono);font-size:13px}
+.foot{color:var(--muted);font-size:13px}
+.toast{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;pointer-events:none;
+  padding:12px max(16px,env(safe-area-inset-right,0px)) calc(16px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.toast span{background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:14px;max-width:100%}
+@media (max-width:640px){
+  body{font-size:17px}
+  h1{font-size:30px}
+  .k{font-size:12.5px}
+  .sub{font-size:15px}
+  .stepper button{width:54px;height:54px;font-size:28px}
+  .stepper .lbl{font-size:18px}
+  .tabs button{padding:14px 16px;font-size:17px}
+  .btn{height:52px;font-size:17px}
+  .pay-actions .btn{height:52px}
+  .seg button{height:52px;font-size:16px}
+  .seg .n{font-size:14px}
+  .grid{grid-template-columns:1fr}
+  .unit{padding:16px;gap:12px}
+  .plate{font-size:22px;min-width:58px}
+  .pill{font-size:14px;padding:3px 11px}
+  .tot .mono{font-size:22px}
+  .strip .v{font-size:22px}
+  input[type="text"],input:not([type]),select,.ro{height:52px}
+  .break{font-size:15px}
+  .owes{font-size:16px}
+  .li .amt{font-size:16px}
+  td,th{padding:12px 14px}
+  table{font-size:15px}
+}
+@media (max-width:420px){
+  .stepper{width:100%;justify-content:space-between}
+  .stepper .lbl{flex:1}
+  .li{grid-template-columns:auto 1fr auto}
+  .li .go{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:no-preference){
+  .btn,.tabs button,.seg button{transition:background .12s,color .12s}
+}
+</style>
+
+<div class="page">
+  <header class="top">
+    <h1>Cornerstone Rentals</h1>
+    <div class="stepper" role="group" aria-label="Billing month">
+      <button type="button" id="m-prev" aria-label="Previous month">&#8249;</button>
+      <div class="lbl" id="m-label" aria-live="polite"></div>
+      <button type="button" id="m-next" aria-label="Next month">&#8250;</button>
+    </div>
+  </header>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+  <main id="view"><p class="empty">Opening the records&hellip;</p></main>
+  <footer class="foot" id="foot"></footer>
+</div>
+<div class="toast" aria-live="polite"><span id="toast" hidden></span></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- constants ---------- */
+var LS_KEY='cornerstone-rentals-v1';
+var BASE_MONTH='2026-09';
+var DEFAULT_RATES={water:160,trash:200,wifi:1000};
+var A_ORDER=['M','N','O','P','L','K','J','I','H','G','F','E','A','C','B'];
+var B_ORDER=['1A','18E','13D','14D','15D','16D','9C','10C','11C','12C','5B','6B','7B','8B'];
+var BASE={
+  A:{M:344,N:232,O:244,P:135,L:106,K:96,J:448,I:205,H:301,G:475,F:369,E:467,A:304,C:743,B:450},
+  B:{'1A':346,'18E':40,'13D':99988,'14D':57,'15D':55,'16D':39,'9C':38,'10C':29,'11C':33,'12C':27,'5B':343,'6B':414,'7B':155,'8B':201}
+};
+var HOUSE_NAME={A:'Cornerstone A',B:'Cornerstone B'};
+var HOUSE_NOTE={A:'old house',B:'new house'};
+
+/* ---------- helpers ---------- */
+var $=function(s){return document.querySelector(s);};
+var view=$('#view');
+function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function num(v){if(v===null||v===undefined||v==='')return null;var n=Number(v);return isNaN(n)?null:n;}
+function fmtN(n){return Number(n).toLocaleString('en-US');}
+function money(n){return 'KSh '+fmtN(Math.round(n));}
+function val(v){return v===null||v===undefined?'':String(v);}
+function clone(x){return JSON.parse(JSON.stringify(x));}
+function monthId(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+function shiftMonth(id,delta){var p=id.split('-').map(Number);return monthId(new Date(p[0],p[1]-1+delta,1));}
+function monthLabel(id,short){var p=id.split('-').map(Number);return new Date(p[0],p[1]-1,1).toLocaleDateString('en-GB',{month:short?'short':'long',year:'numeric'});}
+
+function defaultConfig(){
+  var units=[];
+  A_ORDER.forEach(function(n){units.push({id:'A-'+n,house:'A',name:n,wifi:false});});
+  B_ORDER.forEach(function(n){units.push({id:'B-'+n,house:'B',name:n,wifi:true});});
+  return {units:units,rates:clone(DEFAULT_RATES)};
+}
+function normCfg(c){
+  var d=defaultConfig();
+  if(!c||!Array.isArray(c.units)||!c.units.length)return d;
+  var r=c.rates||{};
+  return {
+    units:c.units.map(function(u){return {id:String(u.id),house:u.house==='B'?'B':'A',name:String(u.name),wifi:!!u.wifi};}),
+    rates:{water:num(r.water)!=null?num(r.water):d.rates.water,trash:num(r.trash)!=null?num(r.trash):d.rates.trash,wifi:num(r.wifi)!=null?num(r.wifi):d.rates.wifi}
+  };
+}
+function seedMonth(){
+  var entries={};
+  Object.keys(BASE).forEach(function(h){Object.keys(BASE[h]).forEach(function(n){entries[h+'-'+n]={cur:BASE[h][n]};});});
+  return {entries:entries,rates:clone(DEFAULT_RATES)};
+}
+
+/* ---------- state ---------- */
+var state={config:defaultConfig(),months:{}};
+var nowId=monthId(new Date());
+var ui={tab:'billing',house:'A',month:nowId,histUnit:null};
+var mode='local', dbh=null, ready=false, readOnly=false;
+var pendingRender=false, saveState='idle', saveErr=null;
+
+function unitById(id){for(var i=0;i<state.config.units.length;i++){if(state.config.units[i].id===id)return state.config.units[i];}return null;}
+function sortedMonths(){return Object.keys(state.months).sort();}
+function ratesFor(mid){var m=state.months[mid];return (m&&m.rates)?m.rates:state.config.rates;}
+function entry(mid,uid){var m=state.months[mid];return (m&&m.entries&&m.entries[uid])||{};}
+function ensureMonth(mid){
+  if(!state.months[mid])state.months[mid]={entries:{},rates:clone(state.config.rates)};
+  if(!state.months[mid].entries)state.months[mid].entries={};
+  if(!state.months[mid].rates)state.months[mid].rates=clone(state.config.rates);
+  return state.months[mid];
+}
+function prevReading(mid,uid){
+  var ids=sortedMonths().filter(function(i){return i<mid;}).reverse();
+  for(var i=0;i<ids.length;i++){var v=num(entry(ids[i],uid).cur);if(v!==null)return {v:v,month:ids[i]};}
+  return null;
+}
+function lastRent(mid,uid){
+  var ids=sortedMonths().filter(function(i){return i<mid;}).reverse();
+  for(var i=0;i<ids.length;i++){var v=num(entry(ids[i],uid).rent);if(v!==null)return v;}
+  return null;
+}
+
+/* ---------- billing maths ---------- */
+function calc(mid,uid){
+  var u=unitById(uid), e=entry(mid,uid), r=ratesFor(mid);
+  var pr=prevReading(mid,uid);
+  var cur=num(e.cur), rent=num(e.rent), paid=num(e.paid)||0;
+  var used=null, water=null, err=null;
+  if(cur!==null&&pr){
+    used=cur-pr.v;
+    if(used<0){err='low';}else{water=used*r.water;}
+  }else if(cur!==null){water=0;}
+  var trash=r.trash, wifi=(u&&u.wifi)?r.wifi:0;
+  var total=null;
+  if(cur!==null&&rent!==null&&!err)total=rent+(water||0)+trash+wifi;
+  var balance=total===null?null:Math.max(0,total-paid);
+  var over=total!==null&&paid>total?paid-total:0;
+  var status='pending';
+  if(total!==null)status=paid>=total?'paid':(paid>0?'part':'unpaid');
+  return {cur:cur,rent:rent,prev:pr?pr.v:null,prevMonth:pr?pr.month:null,used:used,water:water,trash:trash,wifi:wifi,total:total,paid:paid,balance:balance,over:over,status:status,err:err,rates:r};
+}
+function summary(mid){
+  var s={billed:0,collected:0,out:0,n:0,paidN:0};
+  state.config.units.forEach(function(u){
+    var c=calc(mid,u.id);if(c.total===null)return;
+    s.n++;s.billed+=c.total;s.collected+=Math.min(c.paid,c.total);s.out+=c.balance;if(c.status==='paid')s.paidN++;
+  });
+  return s;
+}
+function attention(mid,house){
+  var n=0;
+  state.config.units.forEach(function(u){if(u.house!==house)return;var c=calc(mid,u.id);if(c.status==='unpaid'||c.status==='part')n++;});
+  return n;
+}
+function outstandingList(){
+  var out=[];
+  sortedMonths().forEach(function(mid){
+    state.config.units.forEach(function(u){
+      var c=calc(mid,u.id);
+      if(c.total!==null&&c.balance>0)out.push({mid:mid,u:u,c:c});
+    });
+  });
+  return out;
+}
+
+/* ---------- saving ---------- */
+var timers={}, inflight={}, dirty={};
+function anyBusy(){return Object.keys(dirty).length>0||Object.keys(inflight).length>0;}
+function setSave(s,err){saveState=s;saveErr=err||null;paintFoot();}
+function saveLocal(){try{localStorage.setItem(LS_KEY,JSON.stringify({config:state.config,months:state.months}));}catch(e){}}
+function queueWrite(key){
+  if(readOnly)return;
+  dirty[key]=true;setSave('saving');
+  clearTimeout(timers[key]);
+  timers[key]=setTimeout(function(){flush(key);},450);
+}
+async function flush(key){
+  if(inflight[key]){timers[key]=setTimeout(function(){flush(key);},300);return;}
+  if(!dirty[key])return;
+  delete dirty[key];inflight[key]=true;
+  var failed=null;
+  try{
+    if(mode==='db'){
+      if(key==='config')await dbh.doc('config/main').set(clone(state.config));
+      else{var id=key.slice(2);if(state.months[id])await dbh.doc('months/'+id).set(clone(state.months[id]));}
+    }else{saveLocal();}
+  }catch(e){failed=e;}
+  delete inflight[key];
+  if(failed){setSave('error',failed);}
+  else if(!anyBusy()){setSave(saveErr?'error':'saved',saveErr);}
+}
+function locked(key){return !!(dirty[key]||inflight[key]);}
+
+/* ---------- output text for a unit ---------- */
+function outs(c,u,mid){
+  var o={};
+  o.prev=c.prev===null?'None':fmtN(c.prev);
+  o.used=c.err?'Check':(c.used===null?'—':fmtN(c.used));
+  o.total=c.total===null?'—':money(c.total);
+  o.pill={pending:'Not billed yet',paid:'Paid',part:'Part paid',unpaid:'Not paid'}[c.status];
+  var parts=[];
+  if(c.cur===null)parts.push('Water waits for the reading');
+  else if(c.prev===null)parts.push('No earlier reading, water not charged');
+  else if(c.err)parts.push('Water cannot be worked out yet');
+  else parts.push('Water '+fmtN(c.used)+' × '+c.rates.water+' = '+money(c.water));
+  parts.push('Trash '+money(c.trash));
+  if(c.wifi)parts.push('Wifi '+money(c.wifi));
+  o.brk=parts.join('  ·  ');
+  o.warn=c.err?('Reading is lower than the last one ('+fmtN(c.prev)+'). Check it, or fix '+monthLabel(c.prevMonth)+' if that figure was a typo.'):'';
+  if(c.total===null)o.owes='Needs reading and rent';
+  else if(c.balance>0)o.owes='Owes '+money(c.balance);
+  else if(c.over>0)o.owes='Overpaid '+money(c.over);
+  else o.owes='Cleared';
+  return o;
+}
+
+/* ---------- rendering ---------- */
+function cardHTML(u,mid){
+  var c=calc(mid,u.id), o=outs(c,u,mid), en=entry(mid,u.id);
+  var dis=readOnly?' disabled':'';
+  var lr=lastRent(mid,u.id);
+  var ph=lr!==null?('Last month '+fmtN(lr)):'Key in rent';
+  return '<article class="unit" id="card-'+esc(u.id)+'" data-u="'+esc(u.id)+'" data-st="'+c.status+'">'+
+    '<header class="uh"><span class="plate">'+esc(u.name)+'</span><span class="pill" data-out="pill">'+o.pill+'</span>'+
+      '<div class="tot"><span class="k">Total due</span><span class="mono" data-out="total">'+o.total+'</span></div></header>'+
+    '<div class="meter">'+
+      '<div class="f"><span class="k">Previous</span><span class="mono ro" data-out="prev">'+o.prev+'</span></div>'+
+      '<div class="f"><label class="k" for="cur-'+esc(u.id)+'">Current</label><input type="text" class="mono" id="cur-'+esc(u.id)+'" data-f="cur" inputmode="decimal" autocomplete="off" value="'+esc(val(en.cur))+'"'+dis+'></div>'+
+      '<div class="f"><span class="k">Units used</span><span class="mono ro" data-out="used">'+o.used+'</span></div>'+
+    '</div>'+
+    '<p class="warn" data-out="warn"'+(o.warn?'':' hidden')+'>'+esc(o.warn)+'</p>'+
+    '<div class="f"><label class="k" for="rent-'+esc(u.id)+'">Rent (KSh)</label><input type="text" class="mono" id="rent-'+esc(u.id)+'" data-f="rent" inputmode="decimal" autocomplete="off" placeholder="'+esc(ph)+'" value="'+esc(val(en.rent))+'"'+dis+'></div>'+
+    '<p class="break mono" data-out="brk">'+esc(o.brk)+'</p>'+
+    '<div class="pay">'+
+      '<div class="pay-actions"><button type="button" class="btn" data-act="paid"'+dis+'>Paid</button><button type="button" class="btn" data-act="unpaid"'+dis+'>Not paid</button></div>'+
+      '<div class="pay-amt"><div class="f"><label class="k" for="paid-'+esc(u.id)+'">Amount paid (KSh)</label><input type="text" class="mono" id="paid-'+esc(u.id)+'" data-f="paid" inputmode="decimal" autocomplete="off" placeholder="0" value="'+esc(val(en.paid))+'"'+dis+'></div>'+
+      '<div class="owes" data-out="owes">'+esc(o.owes)+'</div></div>'+
+    '</div></article>';
+}
+function patchCard(card){
+  var uid=card.dataset.u,u=unitById(uid),c=calc(ui.month,uid),o=outs(c,u,ui.month);
+  card.dataset.st=c.status;
+  function set(k,t){var el=card.querySelector('[data-out="'+k+'"]');if(el)el.textContent=t;}
+  set('pill',o.pill);set('total',o.total);set('prev',o.prev);set('used',o.used);set('brk',o.brk);set('owes',o.owes);
+  var w=card.querySelector('[data-out="warn"]');w.textContent=o.warn;w.hidden=!o.warn;
+}
+function patchSummary(){
+  var s=summary(ui.month);
+  function set(k,t){var el=document.querySelector('[data-sum="'+k+'"]');if(el)el.textContent=t;}
+  set('billed',fmtN(Math.round(s.billed)));set('collected',fmtN(Math.round(s.collected)));set('out',fmtN(Math.round(s.out)));
+  set('count',s.n?(s.paidN+' of '+s.n+' billed units are fully paid.'):'No unit is fully billed yet. Enter a reading and the rent for each unit.');
+  ['A','B'].forEach(function(h){set('hc-'+h,String(attention(ui.month,h)));});
+  paintBadge();
+}
+function renderBilling(){
+  var mid=ui.month, s=summary(mid);
+  var units=state.config.units.filter(function(u){return u.house===ui.house;});
+  var canCopy=false;
+  state.config.units.forEach(function(u){if(num(entry(mid,u.id).rent)===null&&lastRent(mid,u.id)!==null)canCopy=true;});
+  var prevIds=sortedMonths().filter(function(i){return i<mid;});
+  var prevNote=prevIds.length?('Previous readings come from '+monthLabel(prevIds[prevIds.length-1])+' and earlier.'):'This is the first month on record, so there are no earlier readings.';
+  var h='<section class="strip" aria-label="Month summary">'+
+    '<div><span class="k">Billed (KSh)</span><span class="v mono" data-sum="billed">'+fmtN(Math.round(s.billed))+'</span></div>'+
+    '<div><span class="k">Collected (KSh)</span><span class="v mono" data-sum="collected">'+fmtN(Math.round(s.collected))+'</span></div>'+
+    '<div><span class="k">Outstanding (KSh)</span><span class="v mono" data-sum="out">'+fmtN(Math.round(s.out))+'</span></div></section>'+
+    '<p class="sub" data-sum="count">'+(s.n?(s.paidN+' of '+s.n+' billed units are fully paid.'):'No unit is fully billed yet. Enter a reading and the rent for each unit.')+'</p>'+
+    '<div class="row"><div class="seg" role="group" aria-label="House">'+
+    ['A','B'].map(function(k){return '<button type="button" data-house="'+k+'" aria-pressed="'+(ui.house===k)+'">'+HOUSE_NAME[k]+'<span class="n" title="Units not fully paid" data-sum="hc-'+k+'">'+attention(mid,k)+'</span></button>';}).join('')+
+    '</div>'+(canCopy&&!readOnly?'<button type="button" class="btn" data-act="copyrents">Copy rents from last month</button>':'')+'</div>'+
+    '<p class="sub">'+esc(prevNote)+' The number beside each house counts units that still owe.</p>'+
+    '<div class="grid">'+units.map(function(u){return cardHTML(u,mid);}).join('')+'</div>';
+  view.innerHTML=h;
+}
+function reminderText(list){
+  var lines=list.map(function(x){return HOUSE_NAME[x.u.house]+', unit '+x.u.name+', '+monthLabel(x.mid,true)+': '+money(x.c.balance);});
+  var tot=list.reduce(function(a,x){return a+x.c.balance;},0);
+  return lines.join('\n')+'\nTotal outstanding: '+money(tot);
+}
+function renderUnpaid(){
+  var list=outstandingList();
+  if(!list.length){
+    view.innerHTML='<div class="panel"><p class="empty">Nothing is outstanding. Balances appear here once a unit has a reading and rent for a month and has not paid in full.</p></div>';
+    return;
+  }
+  var total=list.reduce(function(a,x){return a+x.c.balance;},0);
+  var h='<div class="row"><p class="sub"><strong>'+list.length+'</strong> unpaid or part-paid bills, <strong class="mono">'+money(total)+'</strong> in all.</p><button type="button" class="btn primary" data-act="copylist">Copy list to send</button></div>';
+  ['A','B'].forEach(function(k){
+    var rows=list.filter(function(x){return x.u.house===k;});
+    if(!rows.length)return;
+    var sub=rows.reduce(function(a,x){return a+x.c.balance;},0);
+    h+='<section class="panel"><div class="house-h"><h2>'+HOUSE_NAME[k]+'</h2><span class="mono">'+money(sub)+'</span></div><div class="list">'+
+      rows.map(function(x){
+        return '<div class="li"><span class="plate">'+esc(x.u.name)+'</span>'+
+          '<div class="who"><div>'+monthLabel(x.mid)+'</div><div class="sub">Paid '+money(x.c.paid)+' of '+money(x.c.total)+'</div></div>'+
+          '<span class="amt">'+money(x.c.balance)+'</span>'+
+          '<button type="button" class="btn go" data-act="open" data-m="'+x.mid+'" data-u="'+esc(x.u.id)+'">Open</button></div>';
+      }).join('')+'</div></section>';
+  });
+  h+='<div id="copywrap" hidden class="panel"><span class="k">Select and copy this text</span><textarea id="copybox" readonly></textarea></div>';
+  view.innerHTML=h;
+}
+function renderHistory(){
+  var units=state.config.units;
+  if(!ui.histUnit||!unitById(ui.histUnit))ui.histUnit=units[0].id;
+  var sel='<div class="f" style="max-width:260px"><label class="k" for="hist-unit">Unit</label><select id="hist-unit">'+
+    ['A','B'].map(function(k){return '<optgroup label="'+HOUSE_NAME[k]+'">'+units.filter(function(u){return u.house===k;}).map(function(u){return '<option value="'+esc(u.id)+'"'+(u.id===ui.histUnit?' selected':'')+'>Unit '+esc(u.name)+'</option>';}).join('')+'</optgroup>';}).join('')+
+    '</select></div>';
+  var ids=sortedMonths().reverse().filter(function(mid){var e=entry(mid,ui.histUnit);return num(e.cur)!==null||num(e.rent)!==null;});
+  var dash='—';
+  var f=function(v){return v===null?dash:fmtN(Math.round(v));};
+  var body=ids.map(function(mid){
+    var c=calc(mid,ui.histUnit);
+    return '<tr><td>'+monthLabel(mid)+'</td><td class="mono">'+(c.prev===null?dash:fmtN(c.prev))+'</td><td class="mono">'+f(c.cur)+'</td><td class="mono">'+(c.err?'Check':f(c.used))+'</td><td class="mono">'+f(c.water)+'</td><td class="mono">'+f(c.rent)+'</td><td class="mono">'+f(c.total)+'</td><td class="mono">'+fmtN(c.paid)+'</td><td class="mono">'+f(c.balance)+'</td></tr>';
+  }).join('');
+  view.innerHTML=sel+(ids.length?
+    '<div class="tablewrap"><table><thead><tr><th>Month</th><th>Previous</th><th>Current</th><th>Used</th><th>Water</th><th>Rent</th><th>Total</th><th>Paid</th><th>Owes</th></tr></thead><tbody>'+body+'</tbody></table></div>':
+    '<div class="panel"><p class="empty">No readings recorded for this unit yet.</p></div>');
+}
+function renderSettings(){
+  var r=state.config.rates, dis=readOnly?' disabled':'';
+  var inUse=ratesFor(ui.month), fromOpts='';
+  for(var d=-2;d<=3;d++){var fid=shiftMonth(ui.month,d);fromOpts+='<option value="'+fid+'"'+(d===0?' selected':'')+'>'+monthLabel(fid)+'</option>';}
+  var chips=['A','B'].map(function(k){
+    return '<div class="f"><span class="k">'+HOUSE_NAME[k]+' pays wifi</span><div class="chips">'+
+      state.config.units.filter(function(u){return u.house===k;}).map(function(u){return '<label class="chip"><input type="checkbox" data-wifi="'+esc(u.id)+'"'+(u.wifi?' checked':'')+dis+'>'+esc(u.name)+'</label>';}).join('')+'</div></div>';
+  }).join('');
+  view.innerHTML='<section class="panel"><h2>Prices</h2>'+
+    '<p class="sub">Prices in use for '+monthLabel(ui.month)+': water KSh '+fmtN(inUse.water)+' per unit, trash KSh '+fmtN(inUse.trash)+', wifi KSh '+fmtN(inUse.wifi)+'.</p>'+
+    '<div class="fields">'+
+    '<div class="f"><label class="k" for="rate-water">Water, KSh per unit</label><input type="text" class="mono" id="rate-water" inputmode="decimal" autocomplete="off" value="'+esc(val(r.water))+'"'+dis+'></div>'+
+    '<div class="f"><label class="k" for="rate-trash">Trash, KSh per month</label><input type="text" class="mono" id="rate-trash" inputmode="decimal" autocomplete="off" value="'+esc(val(r.trash))+'"'+dis+'></div>'+
+    '<div class="f"><label class="k" for="rate-wifi">Wifi, KSh per month</label><input type="text" class="mono" id="rate-wifi" inputmode="decimal" autocomplete="off" value="'+esc(val(r.wifi))+'"'+dis+'></div>'+
+    '<div class="f"><label class="k" for="rate-from">New prices start from</label><select id="rate-from"'+dis+'>'+fromOpts+'</select></div></div>'+
+    '<div><button type="button" class="btn primary" data-act="saverates"'+dis+'>Update prices</button></div>'+
+    '<p class="sub">Months before the start month keep the prices they were billed at, so old bills do not change.</p></section>'+
+    '<section class="panel"><h2>Wifi</h2>'+chips+'</section>'+
+    '<section class="panel"><h2>Add a unit</h2><div class="fields">'+
+    '<div class="f"><label class="k" for="nu-house">House</label><select id="nu-house"'+dis+'><option value="A">'+HOUSE_NAME.A+'</option><option value="B">'+HOUSE_NAME.B+'</option></select></div>'+
+    '<div class="f"><label class="k" for="nu-name">Unit label</label><input type="text" id="nu-name" placeholder="for example 17F" autocomplete="off"'+dis+'></div></div>'+
+    '<div><button type="button" class="btn" data-act="addunit"'+dis+'>Add unit</button></div></section>';
+}
+function paintTabs(){
+  var n=outstandingList().length;
+  var tabs=[['billing','Billing'],['unpaid','Unpaid'],['history','History'],['settings','Settings']];
+  $('#tabs').innerHTML=tabs.map(function(t){
+    return '<button type="button" role="tab" data-tab="'+t[0]+'" aria-selected="'+(ui.tab===t[0])+'">'+t[1]+(t[0]==='unpaid'&&n?'<span class="badge" data-badge>'+n+'</span>':'')+'</button>';
+  }).join('');
+}
+function paintBadge(){
+  var n=outstandingList().length, b=document.querySelector('[data-badge]');
+  if(b){if(n)b.textContent=n;else paintTabs();}else if(n)paintTabs();
+}
+function paintStepper(){
+  $('#m-label').textContent=monthLabel(ui.month);
+  $('#m-next').disabled=ui.month>=shiftMonth(nowId,1);
+  $('#m-prev').disabled=ui.month<=shiftMonth(BASE_MONTH,-6);
+}
+function paintFoot(){
+  var el=$('#foot');if(!el)return;
+  var where=mode==='db'?'Records are kept in the shared store for this page.':'Records are kept on this device only. Use the same phone or browser each time.';
+  var st={idle:'',saving:' Saving…',saved:' All changes saved.',error:' Saving failed, check the connection and try again.'}[saveState]||'';
+  el.textContent=(readOnly?'View only. You do not have permission to change these records. ':'')+where+st;
+}
+function render(){
+  pendingRender=false;
+  paintTabs();paintStepper();paintFoot();
+  if(!ready){view.innerHTML='<p class="empty">Opening the records…</p>';return;}
+  if(ui.tab==='billing')renderBilling();
+  else if(ui.tab==='unpaid')renderUnpaid();
+  else if(ui.tab==='history')renderHistory();
+  else renderSettings();
+}
+function renderIfIdle(){
+  var a=document.activeElement;
+  if(a&&view.contains(a)&&(a.tagName==='INPUT'||a.tagName==='SELECT')){pendingRender=true;return;}
+  render();
+}
+var toastTimer=null;
+function toast(msg){
+  var t=$('#toast');t.textContent=msg;t.hidden=false;
+  clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.hidden=true;},2800);
+}
+
+/* ---------- events ---------- */
+$('#tabs').addEventListener('click',function(e){
+  var b=e.target.closest('[data-tab]');if(!b)return;
+  ui.tab=b.dataset.tab;render();
+});
+$('#m-prev').addEventListener('click',function(){ui.month=shiftMonth(ui.month,-1);render();});
+$('#m-next').addEventListener('click',function(){ui.month=shiftMonth(ui.month,1);render();});
+
+view.addEventListener('input',function(e){
+  var t=e.target;
+  if(t.dataset.f){
+    var card=t.closest('[data-u]');if(!card||readOnly)return;
+    var uid=card.dataset.u, f=t.dataset.f;
+    var m=ensureMonth(ui.month);
+    var en=m.entries[uid]||(m.entries[uid]={});
+    en[f]=num(t.value.replace(/,/g,'').trim());
+    if(f==='cur'&&en.rent==null){
+      var lr=lastRent(ui.month,uid);
+      if(lr!==null){en.rent=lr;card.querySelector('[data-f="rent"]').value=lr;}
+    }
+    patchCard(card);patchSummary();queueWrite('m:'+ui.month);
+  }
+});
+view.addEventListener('change',function(e){
+  var t=e.target;
+  if(t.id==='hist-unit'){ui.histUnit=t.value;render();}
+  else if(t.dataset.wifi){var u=unitById(t.dataset.wifi);if(u){u.wifi=t.checked;queueWrite('config');}}
+});
+view.addEventListener('focusout',function(){
+  setTimeout(function(){
+    var a=document.activeElement;
+    if(pendingRender&&!(a&&view.contains(a)&&(a.tagName==='INPUT'||a.tagName==='SELECT')))render();
+  },0);
+});
+view.addEventListener('click',function(e){
+  var h=e.target.closest('[data-house]');
+  if(h){ui.house=h.dataset.house;render();return;}
+  var b=e.target.closest('[data-act]');if(!b)return;
+  var act=b.dataset.act;
+  if(act==='paid'||act==='unpaid'){
+    var uid=b.closest('[data-u]').dataset.u, c=calc(ui.month,uid);
+    if(act==='paid'&&c.total===null){toast('Enter the reading and rent first.');return;}
+    var en=ensureMonth(ui.month).entries[uid]||(state.months[ui.month].entries[uid]={});
+    en.paid=act==='paid'?c.total:0;
+    queueWrite('m:'+ui.month);render();
+  }else if(act==='copyrents'){
+    var m=ensureMonth(ui.month),cnt=0;
+    state.config.units.forEach(function(u){
+      var en2=m.entries[u.id]||(m.entries[u.id]={});
+      if(num(en2.rent)===null){var lr=lastRent(ui.month,u.id);if(lr!==null){en2.rent=lr;cnt++;}}
+    });
+    queueWrite('m:'+ui.month);render();toast('Copied rent for '+cnt+' units.');
+  }else if(act==='open'){
+    ui.month=b.dataset.m;var u2=unitById(b.dataset.u);if(u2)ui.house=u2.house;ui.tab='billing';render();
+    var card=document.getElementById('card-'+b.dataset.u);if(card)card.scrollIntoView({block:'center'});
+  }else if(act==='copylist'){
+    var text=reminderText(outstandingList());
+    var done=function(){toast('List copied.');};
+    var fallback=function(){var w=$('#copywrap'),bx=$('#copybox');w.hidden=false;bx.value=text;bx.focus();bx.select();};
+    try{navigator.clipboard.writeText(text).then(done,fallback);}catch(err){fallback();}
+  }else if(act==='saverates'){
+    var rd=function(id){return num($(id).value.replace(/,/g,'').trim());};
+    var nw=rd('#rate-water'), nt=rd('#rate-trash'), nf=rd('#rate-wifi');
+    if(nw===null||nt===null||nf===null||nw<0||nt<0||nf<0){toast('Enter all three prices as numbers.');return;}
+    var from=$('#rate-from').value;
+    state.config.rates={water:nw,trash:nt,wifi:nf};queueWrite('config');
+    sortedMonths().forEach(function(id){
+      if(id>=from){state.months[id].rates={water:nw,trash:nt,wifi:nf};queueWrite('m:'+id);}
+    });
+    render();toast('Prices updated from '+monthLabel(from)+'.');
+  }else if(act==='addunit'){
+    var house=$('#nu-house').value, name=$('#nu-name').value.trim().toUpperCase();
+    if(!name){toast('Type a unit label first.');return;}
+    var id=house+'-'+name.replace(/[^A-Z0-9]/g,'');
+    if(id.length<3||unitById(id)){toast('That unit already exists.');return;}
+    state.config.units.push({id:id,house:house,name:name,wifi:house==='B'});
+    queueWrite('config');render();toast('Added unit '+name+'.');
+  }
+});
+
+/* ---------- storage start-up ---------- */
+function startLocal(){
+  mode='local';
+  var saved=null;
+  try{saved=JSON.parse(localStorage.getItem(LS_KEY));}catch(e){}
+  if(saved&&saved.config&&saved.months){state.config=normCfg(saved.config);state.months=saved.months;}
+  else{state.config=defaultConfig();state.months={};state.months[BASE_MONTH]=seedMonth();saveLocal();}
+  ready=true;render();
+}
+function startDb(db){
+  mode='db';dbh=db;
+  var got={cfg:false,months:false}, def={cfg:false,months:false}, exists=false, empty=true, seeded=false;
+  function trySeed(){
+    if(seeded||readOnly||!def.cfg||!def.months)return;
+    seeded=true;
+    if(!exists){state.config=defaultConfig();queueWrite('config');}
+    if(empty){state.months[BASE_MONTH]=seedMonth();queueWrite('m:'+BASE_MONTH);}
+    if(!exists||empty)renderIfIdle();
+  }
+  function after(){if(got.cfg&&got.months){ready=true;renderIfIdle();trySeed();}}
+  var fail=function(){if(!ready){ready=true;render();}};
+  db.doc('config/main').onSnapshot(function(snap){
+    got.cfg=true;def.cfg=!snap.metadata.fromCache;exists=snap.exists;
+    if(snap.exists&&!locked('config'))state.config=normCfg(snap.data());
+    after();
+  },fail);
+  db.collection('months').onSnapshot(function(snap){
+    got.months=true;def.months=!snap.metadata.fromCache;empty=snap.size===0;
+    var seen={};
+    snap.docs.forEach(function(d){
+      seen[d.id]=true;
+      if(locked('m:'+d.id))return;
+      var data=clone(d.data()||{});
+      if(!data.entries)data.entries={};
+      state.months[d.id]=data;
+    });
+    Object.keys(state.months).forEach(function(id){if(!seen[id]&&!locked('m:'+id)&&def.months)delete state.months[id];});
+    after();
+  },fail);
+}
+async function boot(){
+  render();
+  var db=null,user=null;
+  var c=window.claude;
+  if(c&&typeof c.use==='function'){
+    try{
+      var res=await Promise.race([Promise.all([c.use('db'),c.use('user')]),new Promise(function(r){setTimeout(function(){r([null,null]);},8000);})]);
+      db=res[0];user=res[1];
+    }catch(e){db=null;}
+  }
+  if(db&&user&&typeof user.can==='function'){
+    try{var ok=await user.can('data.write');if(ok===false)readOnly=true;}catch(e){}
+  }
+  if(db)startDb(db);else startLocal();
+}
+boot();
+})();
+</script>
+</body>
+</html>
